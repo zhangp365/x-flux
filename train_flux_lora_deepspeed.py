@@ -105,7 +105,7 @@ def main():
         if args.output_dir is not None:
             os.makedirs(args.output_dir, exist_ok=True)
 
-    dit, vae, t5, clip = get_models(name=args.model_name, device=accelerator.device, offload=True, is_schnell=is_schnell)
+    dit, vae, t5, clip = get_models(name=args.model_name, device=accelerator.device, offload=False, is_schnell=is_schnell)
     lora_attn_procs = {}
 
     if args.double_blocks is None:

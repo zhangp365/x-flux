@@ -105,7 +105,7 @@ def main():
         if args.output_dir is not None:
             os.makedirs(args.output_dir, exist_ok=True)
 
-    dit, vae, t5, clip = get_models(name=args.model_name, device=accelerator.device, offload=False, is_schnell=is_schnell)
+    dit, vae, t5, clip = get_models(name=args.model_name, device=accelerator.device, offload=True, is_schnell=is_schnell)
     lora_attn_procs = {}
 
     if args.double_blocks is None:
@@ -138,10 +138,18 @@ def main():
 
     dit.set_attn_processor(lora_attn_procs)
 
+    weight_dtype = torch.float32
+    if accelerator.mixed_precision == "fp16":
+        weight_dtype = torch.float16
+        args.mixed_precision = accelerator.mixed_precision
+    elif accelerator.mixed_precision == "bf16":
+        weight_dtype = torch.bfloat16
+        args.mixed_precision = accelerator.mixed_precision
+
     vae.requires_grad_(False)
     t5.requires_grad_(False)
     clip.requires_grad_(False)
-    dit = dit.to(torch.float32)
+    dit = dit.to(weight_dtype)
     dit.train()
     optimizer_cls = torch.optim.AdamW
     for n, param in dit.named_parameters():
@@ -178,15 +186,6 @@ def main():
     dit, optimizer, _, lr_scheduler = accelerator.prepare(
         dit, optimizer, deepcopy(train_dataloader), lr_scheduler
     )
-
-    weight_dtype = torch.float32
-    if accelerator.mixed_precision == "fp16":
-        weight_dtype = torch.float16
-        args.mixed_precision = accelerator.mixed_precision
-    elif accelerator.mixed_precision == "bf16":
-        weight_dtype = torch.bfloat16
-        args.mixed_precision = accelerator.mixed_precision
-
 
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
@@ -290,20 +289,19 @@ def main():
                 train_loss = 0.0
 
                 if not args.disable_sampling and global_step % args.sample_every == 0:
-                    if accelerator.is_main_process:
-                        print(f"Sampling images for step {global_step}...")
-                        sampler = XFluxSampler(clip=clip, t5=t5, ae=vae, model=dit, device=accelerator.device)
-                        images = []
-                        for i, prompt in enumerate(args.sample_prompts):
-                            result = sampler(prompt=prompt,
-                                             width=args.sample_width,
-                                             height=args.sample_height,
-                                             num_steps=args.sample_steps
-                                             )
-                            images.append(wandb.Image(result))
-                            print(f"Result for prompt #{i} is generated")
-                            # result.save(f"{global_step}_prompt_{i}_res.png")
-                        wandb.log({f"Results, step {global_step}": images})
+                    print(f"Sampling images for step {global_step}...")
+                    sampler = XFluxSampler(clip=clip, t5=t5, ae=vae, model=dit, device=accelerator.device)
+                    images = []
+                    for i, prompt in enumerate(args.sample_prompts):
+                        result = sampler(prompt=prompt,
+                                         width=args.sample_width,
+                                         height=args.sample_height,
+                                         num_steps=args.sample_steps
+                                         )
+                        images.append(wandb.Image(result))
+                        print(f"Result for prompt #{i} is generated")
+                        # result.save(f"{global_step}_prompt_{i}_res.png")
+                    wandb.log({f"Results, step {global_step}": images})
 
                 if global_step % args.checkpointing_steps == 0:
                     if accelerator.is_main_process:

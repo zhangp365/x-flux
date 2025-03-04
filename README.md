@@ -54,7 +54,7 @@ Also, our models are avaiable at [civit.ai](https://civitai.com/user/xlabs_ai)
 ### LoRA
 
 ```bash
-accelerate launch train_flux_lora_deepspeed.py --config "train_configs/test_lora.yaml"
+accelerate launch --config_file "train_configs/accelerate_config.yaml" train_flux_lora_deepspeed.py --config "train_configs/test_lora.yaml"
 ```
 
 ### ControlNet

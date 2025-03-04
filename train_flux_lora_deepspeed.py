@@ -326,9 +326,11 @@ def main():
                                     shutil.rmtree(removing_checkpoint)
 
                     save_path = os.path.join(args.output_dir, f"checkpoint-{global_step}")
-
+                    if not os.path.exists(save_path):
+                        os.makedirs(save_path)
                     #由于colab的存储空间有限，所以不保存checkpoint
                     #accelerator.save_state(save_path)
+
                     unwrapped_model_state = accelerator.unwrap_model(dit).state_dict()
 
                     # save checkpoint in safetensors format

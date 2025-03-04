@@ -1,8 +1,8 @@
 from torch import Tensor, nn
 from transformers import (CLIPTextModel, CLIPTokenizer, T5EncoderModel,
                           T5Tokenizer)
-
-
+from pathlib import Path
+from safetensors.torch import load_file
 class HFEmbedder(nn.Module):
     def __init__(self, version: str, max_length: int, **hf_kwargs):
         super().__init__()
@@ -13,6 +13,15 @@ class HFEmbedder(nn.Module):
         if self.is_clip:
             self.tokenizer: CLIPTokenizer = CLIPTokenizer.from_pretrained(version, max_length=max_length)
             self.hf_module: CLIPTextModel = CLIPTextModel.from_pretrained(version, **hf_kwargs)
+
+        elif version.endswith("safetensors"):
+            model_dir = str(Path(version).parent)
+            self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(model_dir, max_length=max_length)
+            self.hf_module: T5EncoderModel = T5EncoderModel.from_pretrained(
+                model_dir, 
+                state_dict=load_file(version),
+                **hf_kwargs
+            )
         else:
             self.tokenizer: T5Tokenizer = T5Tokenizer.from_pretrained(version, max_length=max_length)
             self.hf_module: T5EncoderModel = T5EncoderModel.from_pretrained(version, **hf_kwargs)
